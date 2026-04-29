@@ -1,0 +1,25 @@
+# Ignore sensitive files
+*.key
+*.pem
+*.token
+secrets.txt
+credentials.txt
+
+# Ignore OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Ignore temp files
+*.tmp
+*.log
+*.bak
+
+# Ignore large VM files
+*.vdi
+*.vmdk
+*.ova
+*.ovf
+
+# Ignore Word temp files
+~$*.docx

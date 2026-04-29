@@ -1,0 +1,99 @@
+
+# ============================================================
+# SPLUNK UNIVERSAL FORWARDER - WINDOWS CONFIGURATION
+# File: C:\Program Files\SplunkUniversalForwarder\etc\system\local\inputs.conf
+# ============================================================
+
+[WinEventLog://Security]
+disabled = 0
+index = wineventlog
+
+[WinEventLog://System]
+disabled = 0
+index = wineventlog
+
+[WinEventLog://Application]
+disabled = 0
+index = wineventlog
+
+[WinEventLog://Microsoft-Windows-Sysmon/Operational]
+disabled = 0
+index = sysmon
+renderXml = true
+start_from = oldest
+
+# ============================================================
+# SPLUNK UNIVERSAL FORWARDER - OUTPUT CONFIGURATION
+# File: C:\Program Files\SplunkUniversalForwarder\etc\system\local\outputs.conf
+# ============================================================
+
+[tcpout]
+defaultGroup = splunk_indexer
+
+[tcpout:splunk_indexer]
+server = 192.168.57.10:9997
+
+# ============================================================
+# LINUX ENDPOINT - HEC LOG FORWARDER SCRIPT
+# File: /usr/local/bin/forward-logs.sh
+# ============================================================
+#
+# #!/bin/bash
+# TOKEN="YOUR-HEC-TOKEN-HERE"
+# tail -F /var/log/auth.log | while read line; do
+#     ESCAPED=$(echo "$line" | python3 -c "import sys,json; print(json.dumps(sys.stdin.read().strip()))")
+#     curl -sk -X POST "https://192.168.57.10:8088/services/collector" \
+#     -H "Authorization: Splunk $TOKEN" \
+#     -H "Content-Type: application/json" \
+#     -d "{\"event\": $ESCAPED, \"sourcetype\": \"syslog\"}"
+# done
+#
+# NOTE: Do NOT include "index" in the JSON body.
+# Let the HEC token handle the index assignment.
+#
+# ============================================================
+# LINUX ENDPOINT - SYSTEMD SERVICE
+# File: /etc/systemd/system/log-forwarder.service
+# ============================================================
+#
+# [Unit]
+# Description=Forward auth logs to Splunk HEC
+# After=network.target
+#
+# [Service]
+# ExecStart=/usr/local/bin/forward-logs.sh
+# Restart=always
+# User=root
+#
+# [Install]
+# WantedBy=multi-user.target
+#
+# ============================================================
+# SPLUNK SIEM - WEB INTERFACE BINDING FIX
+# File: /opt/splunk/etc/system/local/web.conf
+# ============================================================
+
+[settings]
+server.socket_host = 0.0.0.0
+
+# ============================================================
+# SPLUNK INDEXES CREATED
+# ============================================================
+# sudo /opt/splunk/bin/splunk add index wineventlog --run-as-root
+# sudo /opt/splunk/bin/splunk add index sysmon --run-as-root
+# sudo /opt/splunk/bin/splunk add index linux-logs --run-as-root
+#
+# NOTE: Linux index uses HYPHEN (linux-logs) not underscore.
+# Be consistent everywhere or searches will return 0 results.
+#
+# ============================================================
+# FIREWALL RULES (SIEM VM)
+# ============================================================
+# sudo ufw allow 22/tcp    - SSH management
+# sudo ufw allow 8000/tcp  - Splunk web UI
+# sudo ufw allow 8088/tcp  - Splunk HEC
+# sudo ufw allow 9997/tcp  - Splunk receiving (forwarder)
+# sudo ufw allow 514/tcp   - Syslog TCP
+# sudo ufw allow 514/udp   - Syslog UDP
+# sudo ufw enable
+# ============================================================

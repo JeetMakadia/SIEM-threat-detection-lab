@@ -1,0 +1,55 @@
+
+# ============================================================
+# DETECTION: Suspicious Encoded PowerShell Execution
+# MITRE ATT&CK: T1059.001 - PowerShell
+# Data Source: Sysmon Event Log
+# Event ID: 1 - Process Creation
+# Alert Severity: High
+# Schedule: Every 5 minutes
+# ============================================================
+
+# DESCRIPTION:
+# Detects PowerShell executed with -EncodedCommand or -enc flags.
+# Attackers use Base64-encoded commands to evade command-line
+# logging and security tools. This is a high-fidelity detection
+# with very low false positive rate in most environments.
+
+index=sysmon source="WinEventLog:Microsoft-Windows-Sysmon/Operational"
+| search _raw="*EncodedCommand*" OR _raw="*-enc *" OR _raw="*-e *powershell*"
+| rex field=_raw "CommandLine>(?P<CommandLine>[^&lt;]+)"
+| rex field=_raw "User>(?P<User>[^&lt;]+)"
+| rex field=_raw "Image>(?P<Image>[^&lt;]+)"
+| rex field=_raw "ParentImage>(?P<ParentImage>[^&lt;]+)"
+| rex field=_raw "Hashes>(?P<Hashes>[^&lt;]+)"
+| table _time, host, User, Image, ParentImage, CommandLine, Hashes
+| eval Severity="HIGH"
+| eval MITRE_Technique="T1059.001 - PowerShell"
+
+# ============================================================
+# INVESTIGATION QUERY - decode the base64 payload
+# Run this after alert fires to understand what was executed
+# ============================================================
+
+index=sysmon source="WinEventLog:Microsoft-Windows-Sysmon/Operational"
+| search _raw="*EncodedCommand*"
+| rex field=_raw "CommandLine>(?P<CommandLine>[^&lt;]+)"
+| rex field=CommandLine "-[Ee](?:ncoded[Cc]ommand)?\s+(?P<EncodedPayload>[A-Za-z0-9+/=]+)"
+| table _time, host, CommandLine, EncodedPayload
+| eval Note="Decode EncodedPayload using: [System.Text.Encoding]::Unicode.GetString([System.Convert]::FromBase64String('PAYLOAD'))"
+
+# ============================================================
+# RELATED DETECTIONS
+# - PowerShell download cradle: *Invoke-WebRequest* OR *IEX*
+# - AMSI bypass attempts: *AmsiUtils* OR *amsiInitFailed*
+# - Reflection loading: *Reflection.Assembly*
+# ============================================================
+
+# ============================================================
+# ALERT CONFIGURATION
+# Name: Suspicious Encoded PowerShell
+# Cron: */5 * * * *
+# Time Range: Last 15 minutes
+# Trigger: Number of results > 0
+# Severity: High
+# Action: Add to Triggered Alerts
+# ============================================================

@@ -1,0 +1,59 @@
+
+# ============================================================
+# LAB NETWORK CONFIGURATION
+# ============================================================
+# Network: 192.168.57.0/24 (VirtualBox Host-Only)
+# Gateway: 192.168.57.1
+#
+# VM          | IP              | RAM    | OS
+# ------------|-----------------|--------|-------------------
+# SIEM        | 192.168.57.10   | 4096MB | Ubuntu 24.04 LTS
+# WIN-ENDPOINT| 192.168.57.20   | 2048MB | Windows 10
+# Linux-Endpt | 192.168.57.30   | 512MB  | Ubuntu 24.04 LTS
+#
+# ============================================================
+# UBUNTU NETPLAN CONFIGURATION
+# File: /etc/netplan/50-cloud-init.yaml
+# ============================================================
+
+# SIEM VM (192.168.57.10):
+network:
+  version: 2
+  ethernets:
+    enp0s3:
+      dhcp4: true
+    enp0s8:
+      dhcp4: false
+      addresses: [192.168.57.10/24]
+
+# Linux-Endpoint VM (192.168.57.30):
+network:
+  version: 2
+  ethernets:
+    enp0s3:
+      dhcp4: true
+    enp0s8:
+      dhcp4: false
+      addresses: [192.168.57.30/24]
+
+# APPLY WITH:
+# sudo chmod 600 /etc/netplan/50-cloud-init.yaml
+# sudo netplan apply
+# sudo ip link set enp0s8 up
+
+# ============================================================
+# WINDOWS STATIC IP (PowerShell Admin)
+# ============================================================
+# New-NetIPAddress -InterfaceAlias "Ethernet 2" -IPAddress 192.168.57.20 -PrefixLength 24 -DefaultGateway 192.168.57.1
+# Set-DnsClientServerAddress -InterfaceAlias "Ethernet 2" -ServerAddresses 8.8.8.8
+
+# ============================================================
+# PORT REFERENCE
+# ============================================================
+# 22    - SSH (management)
+# 514   - Syslog (TCP/UDP)
+# 8000  - Splunk Web UI
+# 8088  - Splunk HEC (HTTP Event Collector)
+# 8089  - Splunk Management Port
+# 9997  - Splunk Receiving (Universal Forwarder)
+# ============================================================

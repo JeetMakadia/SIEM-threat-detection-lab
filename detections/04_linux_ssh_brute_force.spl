@@ -1,0 +1,70 @@
+
+# ============================================================
+# DETECTION: Linux SSH Brute Force Attack
+# MITRE ATT&CK: T1110 - Brute Force
+#               T1021.004 - SSH
+# Data Source: Linux auth.log via Splunk HEC
+# Index: linux-logs
+# Alert Severity: High
+# Schedule: Every 5 minutes
+# ============================================================
+
+# DESCRIPTION:
+# Detects repeated SSH authentication failures from the same
+# source IP targeting Linux systems. Threshold of 5+ failures
+# in 15 minutes indicates automated attack. Captures both
+# valid username attacks and invalid user attempts.
+
+index="linux-logs" "Failed password"
+| rex field=_raw "Failed password for (?:invalid user )?(?P<username>\w+) from (?P<src_ip>[\w:\.]+) port (?P<port>\d+)"
+| stats count by src_ip, username
+| where count > 5
+| sort -count
+| rename count as "Failed_Attempts"
+| eval Severity="HIGH"
+| eval MITRE_Technique="T1110 / T1021.004"
+| eval Note=if(username=="invalid user", "Unknown username - likely scanning", "Valid username targeted - higher risk")
+
+# ============================================================
+# TIME-BASED DETECTION - buckets for trend analysis
+# ============================================================
+
+index="linux-logs" "Failed password"
+| rex field=_raw "Failed password for (?:invalid user )?(?P<username>\w+) from (?P<src_ip>[\w:\.]+)"
+| bucket _time span=5m
+| stats count by _time, src_ip
+| where count > 5
+| sort -_time
+
+# ============================================================
+# INVESTIGATION QUERY - full attack timeline
+# ============================================================
+
+index="linux-logs" "Failed password" OR "Accepted password" OR "Accepted publickey"
+| rex field=_raw "(?P<auth_result>Failed password|Accepted password|Accepted publickey) for (?:invalid user )?(?P<username>\w+) from (?P<src_ip>[\w:\.]+)"
+| table _time, src_ip, username, auth_result
+| sort _time
+| eval Alert=if(auth_result="Accepted password", "SUCCESS AFTER FAILURES - INVESTIGATE IMMEDIATELY", "Failed attempt")
+
+# ============================================================
+# DASHBOARD PANEL QUERIES
+# ============================================================
+
+# Top attacking IPs (Bar Chart)
+# index="linux-logs" "Failed password"
+# | rex field=_raw "from (?P<src_ip>[\w:\.]+) port"
+# | stats count by src_ip | sort -count | head 10
+
+# SSH failures over time (Line Chart)
+# index="linux-logs" "Failed password"
+# | timechart span=5m count as SSH_Failures
+
+# ============================================================
+# ALERT CONFIGURATION
+# Name: Linux SSH Brute Force
+# Cron: */5 * * * *
+# Time Range: Last 15 minutes
+# Trigger: Number of results > 0
+# Severity: High
+# Action: Add to Triggered Alerts
+# ============================================================

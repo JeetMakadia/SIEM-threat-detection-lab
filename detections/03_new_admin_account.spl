@@ -1,0 +1,62 @@
+
+# ============================================================
+# DETECTION: Unauthorized Administrator Account Creation
+# MITRE ATT&CK: T1136.001 - Create Local Account
+#               T1078.003 - Valid Accounts: Local Accounts
+# Data Source: Windows Security Event Log
+# Event ID: 4720 - User account created
+#           4732 - Member added to security-enabled local group
+# Alert Severity: Critical
+# Schedule: Every 5 minutes
+# ============================================================
+
+# DESCRIPTION:
+# Detects creation of new local user accounts and addition of
+# accounts to privileged groups (Administrators). This is a
+# critical indicator of persistence and privilege escalation.
+# Attackers create backdoor accounts to maintain access after
+# initial compromise.
+
+index=wineventlog (EventCode=4720 OR EventCode=4732)
+| rex field=_raw "Account Name:\s+(?P<Account_Name>\S+)"
+| rex field=_raw "Security ID:\s+(?P<Security_ID>\S+)"
+| eval EventType=case(
+    EventCode="4720", "New Account Created",
+    EventCode="4732", "Added to Admin Group",
+    true(), "Unknown"
+)
+| table _time, ComputerName, EventType, Account_Name, Security_ID
+| eval Severity="CRITICAL"
+| eval MITRE_Technique="T1136.001 / T1078.003"
+
+# ============================================================
+# COMBINED ALERT - Account created AND added to admins
+# This catches the full attack chain in one query
+# ============================================================
+
+index=wineventlog EventCode=4720 OR EventCode=4732
+| transaction Account_Name maxspan=5m
+| where eventcount >= 2
+| table _time, ComputerName, Account_Name, eventcount, duration
+| eval Alert="Account created and added to privileged group within 5 minutes"
+| eval Severity="CRITICAL"
+
+# ============================================================
+# INVESTIGATION QUERY - who created the account?
+# ============================================================
+
+index=wineventlog EventCode=4720
+| rex field=_raw "Subject:\s+Security ID:\s+\S+\s+Account Name:\s+(?P<Created_By>\S+)"
+| rex field=_raw "New Account:\s+Security ID:\s+\S+\s+Account Name:\s+(?P<New_Account>\S+)"
+| table _time, ComputerName, Created_By, New_Account
+| eval Note="Investigate the Created_By account for compromise indicators"
+
+# ============================================================
+# ALERT CONFIGURATION
+# Name: New Admin Account Created
+# Cron: */5 * * * *
+# Time Range: Last 15 minutes
+# Trigger: Number of results > 0
+# Severity: Critical
+# Action: Add to Triggered Alerts
+# ============================================================

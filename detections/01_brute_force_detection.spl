@@ -1,0 +1,45 @@
+
+# ============================================================
+# DETECTION: Windows Brute Force Login Attack
+# MITRE ATT&CK: T1110 - Brute Force
+# Data Source: Windows Security Event Log
+# Event ID: 4625 - An account failed to log on
+# Alert Severity: High
+# Schedule: Every 5 minutes
+# ============================================================
+
+# DESCRIPTION:
+# Detects 5 or more failed logon attempts on the same machine
+# within a 5-minute window. Indicative of automated credential
+# stuffing or brute force attack.
+
+index=wineventlog EventCode=4625
+| bucket _time span=5m
+| stats count by _time, ComputerName
+| where count > 5
+| rename count as "Failed_Attempts"
+| eval Severity="HIGH"
+| eval MITRE_Technique="T1110 - Brute Force"
+| table _time, ComputerName, Failed_Attempts, Severity, MITRE_Technique
+
+# ============================================================
+# INVESTIGATION QUERY - deeper dive after alert fires
+# ============================================================
+
+index=wineventlog EventCode=4625
+| rex field=_raw "Account Name:\s+(?P<Account_Name>\S+)"
+| rex field=_raw "Failure Reason:\s+(?P<Failure_Reason>[^\r\n]+)"
+| rex field=_raw "Source Network Address:\s+(?P<Src_IP>\S+)"
+| stats count by Account_Name, Src_IP, Failure_Reason, ComputerName
+| sort -count
+| rename count as "Attempt_Count"
+
+# ============================================================
+# ALERT CONFIGURATION
+# Name: Brute Force Detection
+# Cron: */5 * * * *
+# Time Range: Last 15 minutes
+# Trigger: Number of results > 0
+# Severity: High
+# Action: Add to Triggered Alerts
+# ============================================================

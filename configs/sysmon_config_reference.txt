@@ -1,0 +1,103 @@
+
+# ============================================================
+# SYSMON CONFIGURATION REFERENCE
+# Version: SwiftOnSecurity sysmonconfig-export.xml
+# Sysmon Version: v15.20
+# ============================================================
+#
+# DOWNLOAD THE ACTUAL CONFIG FROM:
+# https://github.com/SwiftOnSecurity/sysmon-config
+#
+# INSTALLATION COMMANDS:
+# Invoke-WebRequest -Uri "https://download.sysinternals.com/files/Sysmon.zip" -OutFile "C:\Sysmon.zip"
+# Expand-Archive -Path "C:\Sysmon.zip" -DestinationPath "C:\Sysmon"
+# Invoke-WebRequest -Uri "https://raw.githubusercontent.com/SwiftOnSecurity/sysmon-config/master/sysmonconfig-export.xml" -OutFile "C:\Sysmon\sysmonconfig.xml"
+# C:\Sysmon\Sysmon64.exe -accepteula -i C:\Sysmon\sysmonconfig.xml
+#
+# VERIFY INSTALLATION:
+# Get-Service Sysmon64
+#
+# ============================================================
+# KEY EVENT IDs CAPTURED BY THIS CONFIG
+# ============================================================
+#
+# Event ID 1  - Process Creation
+#   Captures: Image, CommandLine, User, ParentImage,
+#              ParentCommandLine, Hashes, ProcessGuid
+#   Detects:  Malware execution, encoded PowerShell,
+#             suspicious child processes
+#
+# Event ID 2  - File Creation Time Changed
+#   Captures: TargetFilename, CreationUtcTime
+#   Detects:  Timestomping (anti-forensics)
+#
+# Event ID 3  - Network Connection
+#   Captures: Image, DestinationIp, DestinationPort,
+#              Protocol, DestinationHostname
+#   Detects:  C2 communication, lateral movement,
+#             beaconing behavior
+#
+# Event ID 7  - Image Loaded
+#   Captures: Image, ImageLoaded, Hashes, Signed
+#   Detects:  DLL injection, malicious module loading
+#
+# Event ID 8  - CreateRemoteThread
+#   Captures: SourceImage, TargetImage, StartAddress
+#   Detects:  Process injection techniques
+#
+# Event ID 10 - ProcessAccess
+#   Captures: SourceImage, TargetImage, GrantedAccess
+#   Detects:  Credential dumping (LSASS access)
+#
+# Event ID 11 - FileCreate
+#   Captures: Image, TargetFilename, CreationUtcTime
+#   Detects:  Malware dropper, suspicious file creation
+#
+# Event ID 12 - RegistryEvent (Object create/delete)
+# Event ID 13 - RegistryEvent (Value Set)
+#   Captures: EventType, TargetObject, Details
+#   Detects:  Persistence via registry, config changes
+#
+# Event ID 15 - FileCreateStreamHash
+#   Captures: TargetFilename, Hash
+#   Detects:  Alternate Data Streams (hiding malware)
+#
+# Event ID 22 - DNSEvent
+#   Captures: Image, QueryName, QueryResults
+#   Detects:  C2 domain resolution, DNS tunneling
+#
+# Event ID 23 - FileDelete
+#   Captures: TargetFilename, User
+#   Detects:  Log tampering, evidence destruction
+#
+# ============================================================
+# SPLUNK SEARCH EXAMPLES BY EVENT ID
+# ============================================================
+#
+# All Sysmon events:
+# index=sysmon | head 20
+#
+# Process creation (Event 1):
+# index=sysmon EventCode=1
+# | rex field=_raw "Image>(?P<Image>[^<]+)"
+# | rex field=_raw "CommandLine>(?P<CommandLine>[^<]+)"
+# | table _time, host, Image, CommandLine
+#
+# Network connections (Event 3):
+# index=sysmon EventCode=3
+# | rex field=_raw "DestinationIp>(?P<DestIP>[^<]+)"
+# | rex field=_raw "DestinationPort>(?P<DestPort>[^<]+)"
+# | stats count by DestIP, DestPort | sort -count
+#
+# DNS queries (Event 22):
+# index=sysmon EventCode=22
+# | rex field=_raw "QueryName>(?P<Domain>[^<]+)"
+# | stats count by Domain | sort -count
+#
+# LSASS access (potential credential dumping):
+# index=sysmon EventCode=10
+# | rex field=_raw "TargetImage>(?P<TargetImage>[^<]+)"
+# | search TargetImage="*lsass*"
+# | table _time, host, SourceImage, TargetImage, GrantedAccess
+#
+# ============================================================
